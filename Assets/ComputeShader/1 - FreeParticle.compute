@@ -1,0 +1,145 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "SimplexNoise3D.cginc"
+
+// Particle's data
+struct Particle
+{
+	float3 position;
+	float3 velocity;
+};
+
+RWStructuredBuffer<Particle> particleBuffer;
+
+float Time;
+float MaxAge;
+float2 TouchPos;
+float4 Weights[6];
+float NumParticles;
+Texture2D<float4> NoiseTex;
+
+SamplerState _LinearClamp;
+
+float3 F1(float3 p)
+{
+	return p * 0.9;
+}
+
+float3 F2(float3 p)
+{
+	return sin( p ) * cos(3.0 * p);
+}
+
+float3 F3(float3 p)
+{
+	// return p / (p.x * p.x + p.y * p.y + p.z * p.z);
+	return float3(
+		p.x + 3.0 * sin(tan(3.0 * p.y)), 
+		p.y + 3.0 * sin(tan(3.0 * p.z)), 
+		p.z + 3.0 * sin(tan(3.0 * p.x)));
+}
+
+float3 F4(float3 p)
+{
+	float r2 = dot(p,p);
+
+	return float3(
+		p.x * sin(r2) - p.y * cos(r2),
+		p.x * sin(r2) - p.z * cos(r2),
+		p.z * cos(r2) - p.x * sin(r2));
+}
+
+float3 F5(float3 p)
+{
+	float r2 = dot(p,p);
+
+	return float3(
+		p.x * sin(r2) - p.y * cos(r2),
+		p.x * sin(r2) - p.z * cos(r2),
+		p.z * cos(r2) - p.x * cos(r2));
+}
+
+float rand(float n){return frac(sin(n) * 43758.5453123);}
+
+float3 random3(int id, float3 pos)
+{
+
+	float2 uv = float2((float)(id % 4096) , id / 4096.0);
+
+	uv /=  float2(4096.0, NumParticles / 4096.0 + 1 );
+
+	return frac( pos + NoiseTex.SampleLevel(_LinearClamp, uv, 0).rgb );
+}
+
+[numthreads(256, 1, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+
+	float3 pos = particleBuffer[id.x].position;
+	float life = particleBuffer[id.x].velocity.x;
+	float colormap = particleBuffer[id.x].velocity.y;
+
+	if ( particleBuffer[id.x].velocity.x > MaxAge)
+	{ 
+		life = 0;
+		colormap = 0;
+		pos = 2.0 * random3(id, pos) - 1.0;
+	}
+	
+	life += length(pos);
+
+	float w0 = 1.0; // 0.5 + 0.4 * sin(Time);
+	float w1 = TouchPos.x; //0.2 + 0.5 * sin(Time);
+	float w2 =   TouchPos.y; //0.2 + 0.5 * sin(Time* 0.13);
+
+	float3 pos0 = pos;
+	pos =   w0 * F4(pos) +
+			w1 * F2(pos) +
+			w2 * F3(pos);
+	
+	colormap = length(pos0-pos);
+
+	particleBuffer[id.x].position = pos;
+	
+
+	particleBuffer[id.x].velocity.x = life ;
+	particleBuffer[id.x].velocity.y = colormap ;
+}
+
+
+
+[numthreads(256, 1, 1)]
+void CSMainNew (uint3 id : SV_DispatchThreadID)
+{
+
+	float3 pos = particleBuffer[id.x].position;
+	float life = particleBuffer[id.x].velocity.x;
+	float colormap = particleBuffer[id.x].velocity.y;
+
+	if ( particleBuffer[id.x].velocity.x > MaxAge) // || max(max(pos.x, pos.y), pos.z)  > 1.0)
+	{ 
+		life = 0;
+		colormap = 0;
+		pos = 2.0 * random3(id, pos) - 1.0;
+	}
+	
+	life += 1;
+
+	float3 pos0 = pos;
+
+	// pos = Weights[0] * F0(pos);
+	pos = Weights[1] * F1(pos);
+	pos = Weights[2] * F2(pos);
+	pos = Weights[3] * F3(pos);
+	pos = Weights[4] * F4(pos);
+	pos = Weights[5] * F5(pos);
+
+
+	colormap = length(pos0 - pos);
+
+	particleBuffer[id.x].position = pos;
+	
+	particleBuffer[id.x].velocity.x = life ;
+	particleBuffer[id.x].velocity.y = colormap ;
+}
