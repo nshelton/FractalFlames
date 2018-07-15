@@ -3,74 +3,45 @@ using System.Collections;
 
 public class FreeParticle : MonoBehaviour
 {
-    /// <summary>
-    /// Particle data structure used by the shader and the compute shader.
-    /// </summary>
     private struct Particle
     {
         public Vector3 position;
         public Vector3 velocity;
     }
 
-    /// <summary>
-    /// Size in octet of the Particle struct.
-    /// </summary>
     private const int SIZE_PARTICLE = 24;
 
-    /// <summary>
-    /// Number of Particle created in the system.
-    /// </summary>
     public int particleCount = 1000;
 
-    /// <summary>
-    /// Material used to draw the Particle on screen.
-    /// </summary>
     public Material material;
 
-    /// <summary>
-    /// Compute shader used to update the Particles.
-    /// </summary>
     public ComputeShader computeShader;
 
-    /// <summary>
-    /// Id of the kernel used.
-    /// </summary>
     private int mComputeShaderKernelID;
 
-    /// <summary>
-    /// Buffer holding the Particles.
-    /// </summary>
     ComputeBuffer particleBuffer;
 
-    /// <summary>
-    /// Number of particle per warp.
-    /// </summary>
     private const int WARP_SIZE = 256;
 
-    /// <summary>
-    /// Number of warp needed.
-    /// </summary>
     private int mWarpCount;
-	
-	[SerializeField]
+
+    [SerializeField]
     private float MaxAge;
 
-    private Vector2 m_touchPos;
+    public Vector4 WeightsA;
+    public Vector4 WeightsB;
+    public Vector4 WeightsC;
+    public Vector4 WeightsD;
+    public float TransitionSpeed = 0.99f;
 
-    public float touchX
-    {
-        get { return m_touchPos.x; }
-        set { m_touchPos.x = value; }
-    }
+    private Vector4 NextWeightsA;
+    private Vector4 NextWeightsB;
+    private Vector4 NextWeightsC;
+    private Vector4 NextWeightsD;
 
-    public float touchY
-    {
-        get { return m_touchPos.y; }
-        set { m_touchPos.y = value; }
-    }
+    private bool isTransition = false;
 
-	public float[] Weights;
-
+    public Vector4 Emitter;
 
     Texture2D noiseTexture;
 
@@ -96,23 +67,23 @@ public class FreeParticle : MonoBehaviour
         {
             particleArray[i].position = Random.insideUnitSphere;
             particleArray[i].velocity = Vector3.one * float.MaxValue;
-			particleArray[i].velocity.x = Random.value * MaxAge;
+            particleArray[i].velocity.x = Random.value * MaxAge;
         }
 
         noiseTexture = new Texture2D(4096, Mathf.CeilToInt(particleCount / 4096));
 
-        for (int x = 0; x < noiseTexture.width; x ++) 
-		{
-	        for (int y = 0; y < noiseTexture.height; y ++)
-			{	
-				noiseTexture.SetPixel(x,y,new Color(Random.value, Random.value, Random.value));
-			}
-		}
+        for (int x = 0; x < noiseTexture.width; x++)
+        {
+            for (int y = 0; y < noiseTexture.height; y++)
+            {
+                noiseTexture.SetPixel(x, y, new Color(Random.value, Random.value, Random.value));
+            }
+        }
 
-		noiseTexture.Apply();
+        noiseTexture.Apply();
 
-    	// Create the ComputeBuffer holding the Particles
-		particleBuffer = new ComputeBuffer(particleCount, SIZE_PARTICLE);
+        // Create the ComputeBuffer holding the Particles
+        particleBuffer = new ComputeBuffer(particleCount, SIZE_PARTICLE);
         particleBuffer.SetData(particleArray);
 
         // Find the id of the kernel
@@ -130,16 +101,52 @@ public class FreeParticle : MonoBehaviour
             particleBuffer.Release();
     }
 
+    public void Randomize()
+    {
+        NextWeightsA.x = Random.value * 2f - 1f;
+        NextWeightsA.y = Random.value * 2f - 1f;
+        NextWeightsA.z = Random.value * 2f - 1f;
+        NextWeightsA.w = Random.value * 2f - 1f;
+
+        NextWeightsB.x = Random.value * 2f - 1f;
+        NextWeightsB.y = Random.value * 2f - 1f;
+        NextWeightsB.z = Random.value * 2f - 1f;
+        NextWeightsB.w = Random.value * 2f - 1f;
+
+        NextWeightsC.x = Random.value * 2f - 1f;
+        NextWeightsC.y = Random.value * 2f - 1f;
+        NextWeightsC.z = Random.value * 2f - 1f;
+        NextWeightsC.w = Random.value * 2f - 1f;
+
+        NextWeightsD.x = Random.value * 2f - 1f;
+        NextWeightsD.y = Random.value * 2f - 1f;
+        NextWeightsD.z = Random.value * 2f - 1f;
+        NextWeightsD.w = Random.value * 2f - 1f;
+
+        isTransition = true;
+    }
+
     void Update()
     {
         computeShader.SetFloat("Time", Time.time);
-        computeShader.SetVector("TouchPos", m_touchPos);
         computeShader.SetFloat("NumParticles", particleCount);
         computeShader.SetFloat("MaxAge", MaxAge);
 
-		computeShader.SetFloats("Weights", Weights);
+        computeShader.SetVector("WeightsA", WeightsA);
+        computeShader.SetVector("WeightsB", WeightsB);
+        computeShader.SetVector("WeightsC", WeightsC);
+        computeShader.SetVector("WeightsD", WeightsD);
+        computeShader.SetVector("Emitter", Emitter);
 
         computeShader.Dispatch(mComputeShaderKernelID, mWarpCount, 1, 1);
+
+        if (isTransition)
+        {
+            WeightsA = Vector4.Lerp(NextWeightsA, WeightsA, TransitionSpeed);
+            WeightsB = Vector4.Lerp(NextWeightsB, WeightsB, TransitionSpeed);
+            WeightsC = Vector4.Lerp(NextWeightsC, WeightsC, TransitionSpeed);
+            WeightsD = Vector4.Lerp(NextWeightsD, WeightsD, TransitionSpeed);
+        }
     }
 
     void OnRenderObject()

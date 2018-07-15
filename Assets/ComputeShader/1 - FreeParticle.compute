@@ -2,6 +2,7 @@
 #pragma kernel CSMain
 
 #include "SimplexNoise3D.cginc"
+#include "Transforms.cginc"
 
 // Particle's data
 struct Particle
@@ -14,132 +15,127 @@ RWStructuredBuffer<Particle> particleBuffer;
 
 float Time;
 float MaxAge;
-float2 TouchPos;
-float4 Weights[6];
+
 float NumParticles;
 Texture2D<float4> NoiseTex;
 
+float4 WeightsA;
+float4 WeightsB;
+float4 WeightsC;
+float4 WeightsD;
+
+float4 Emitter;
+
 SamplerState _LinearClamp;
-
-float3 F1(float3 p)
-{
-	return p * 0.9;
-}
-
-float3 F2(float3 p)
-{
-	return sin( p ) * cos(3.0 * p);
-}
-
-float3 F3(float3 p)
-{
-	// return p / (p.x * p.x + p.y * p.y + p.z * p.z);
-	return float3(
-		p.x + 3.0 * sin(tan(3.0 * p.y)), 
-		p.y + 3.0 * sin(tan(3.0 * p.z)), 
-		p.z + 3.0 * sin(tan(3.0 * p.x)));
-}
-
-float3 F4(float3 p)
-{
-	float r2 = dot(p,p);
-
-	return float3(
-		p.x * sin(r2) - p.y * cos(r2),
-		p.x * sin(r2) - p.z * cos(r2),
-		p.z * cos(r2) - p.x * sin(r2));
-}
-
-float3 F5(float3 p)
-{
-	float r2 = dot(p,p);
-
-	return float3(
-		p.x * sin(r2) - p.y * cos(r2),
-		p.x * sin(r2) - p.z * cos(r2),
-		p.z * cos(r2) - p.x * cos(r2));
-}
 
 float rand(float n){return frac(sin(n) * 43758.5453123);}
 
 float3 random3(int id, float3 pos)
 {
-
 	float2 uv = float2((float)(id % 4096) , id / 4096.0);
-
 	uv /=  float2(4096.0, NumParticles / 4096.0 + 1 );
-
 	return frac( pos + NoiseTex.SampleLevel(_LinearClamp, uv, 0).rgb );
 }
+
+// float3 TowardsOriginNegativeBias(float3 point)
+// float3 TowardsOrigin2(float3 point)
+// float3 Swap(float3 point)
+// float3 SwapSub(float3 point)
+// float3 Negate(float3 point)
+// float3 NegateSwap(float3 point)
+// float3 Up1(float3 point)
+// float3 Linear(float3 point)
+// float3 Sin(float3 point)
+// float3 Spherical(float3 point)
+// float3 Polar(float3 point)
+// float3 Swirl(float3 point)
+// float3 Normalize(float3 point)
+// float3 Shrink(float3 point)
+
+// float3 F1(float3 p)
+// float3 F2(float3 p)
+// float3 F3(float3 p)
+// float3 F4(float3 p)
+// float3 F5(float3 p)
 
 [numthreads(256, 1, 1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
+	Particle particleData =  particleBuffer[id.x];
+	float3 pos = particleData.position;
+	float life = particleData.velocity.x;
+	float colormap = particleData.velocity.y;
 
-	float3 pos = particleBuffer[id.x].position;
-	float life = particleBuffer[id.x].velocity.x;
-	float colormap = particleBuffer[id.x].velocity.y;
-
-	if ( particleBuffer[id.x].velocity.x > MaxAge)
+	if ( particleData.velocity.x > MaxAge)
 	{ 
 		life = 0;
 		colormap = 0;
-		pos = 2.0 * random3(id, pos) - 1.0;
+		pos = 2.0 * Emitter * random3(id, pos) - Emitter;
 	}
 	
-	life += length(pos);
-
-	float w0 = 1.0; // 0.5 + 0.4 * sin(Time);
-	float w1 = TouchPos.x; //0.2 + 0.5 * sin(Time);
-	float w2 =   TouchPos.y; //0.2 + 0.5 * sin(Time* 0.13);
+	life += (float)id/ (float)NumParticles;
 
 	float3 pos0 = pos;
-	pos =   w0 * F4(pos) +
-			w1 * F2(pos) +
-			w2 * F3(pos);
-	
+
+	int affineIndex = 0;
+	float maxAffine = WeightsA.x + WeightsA.y + WeightsA.z + WeightsA.a + WeightsB.x + WeightsB.y + WeightsB.z + WeightsB.a;
+
+	float random = rand(Time + (float)id/ (float)NumParticles) * maxAffine;
+
+	if(random < WeightsA.x)
+	{
+		pos = TowardsOriginNegativeBias(pos); 
+	}
+	else if(random <  WeightsA.x + WeightsA.y)
+	{
+		pos = TowardsOrigin2(pos); 
+	}
+	else if(random <  WeightsA.x + WeightsA.y +  WeightsA.z )
+	{
+		pos = Swap(pos); 
+	}
+	else if(random <  WeightsA.x + WeightsA.y +  WeightsA.z + WeightsA.a )
+	{
+		pos = SwapSub(pos); 
+	}
+	else if(random <  WeightsA.x + WeightsA.y +  WeightsA.z + WeightsA.a + WeightsB.x )
+	{
+		pos = Negate(pos);
+	}
+	else if(random <  WeightsA.x + WeightsA.y +  WeightsA.z + WeightsA.a + WeightsB.x + WeightsB.y )
+	{
+		pos = NegateSwap(pos); 
+	}
+	else
+	{
+		pos = Up1(pos); 
+	}
+
+	float maxVariation = WeightsC.x + WeightsC.y + WeightsC.z + WeightsC.a;
+	 random = rand(Time + (float)id/ (float)NumParticles) * maxVariation;
+
+	if(random < WeightsC.x)
+	{
+		pos = Sin(pos); 
+	}
+	else if(random < WeightsC.x + WeightsC.y)
+	{
+		pos = Spherical(pos); 
+	}
+	else if(random < WeightsC.x + WeightsC.y + WeightsC.z)
+	{
+		pos = Normalize(pos); 
+	}
+	else 
+	{
+		pos = Swirl(pos); 
+	}
+
 	colormap = length(pos0-pos);
 
 	particleBuffer[id.x].position = pos;
-	
 
 	particleBuffer[id.x].velocity.x = life ;
 	particleBuffer[id.x].velocity.y = colormap ;
 }
 
-
-
-[numthreads(256, 1, 1)]
-void CSMainNew (uint3 id : SV_DispatchThreadID)
-{
-
-	float3 pos = particleBuffer[id.x].position;
-	float life = particleBuffer[id.x].velocity.x;
-	float colormap = particleBuffer[id.x].velocity.y;
-
-	if ( particleBuffer[id.x].velocity.x > MaxAge) // || max(max(pos.x, pos.y), pos.z)  > 1.0)
-	{ 
-		life = 0;
-		colormap = 0;
-		pos = 2.0 * random3(id, pos) - 1.0;
-	}
-	
-	life += 1;
-
-	float3 pos0 = pos;
-
-	// pos = Weights[0] * F0(pos);
-	pos = Weights[1] * F1(pos);
-	pos = Weights[2] * F2(pos);
-	pos = Weights[3] * F3(pos);
-	pos = Weights[4] * F4(pos);
-	pos = Weights[5] * F5(pos);
-
-
-	colormap = length(pos0 - pos);
-
-	particleBuffer[id.x].position = pos;
-	
-	particleBuffer[id.x].velocity.x = life ;
-	particleBuffer[id.x].velocity.y = colormap ;
-}
