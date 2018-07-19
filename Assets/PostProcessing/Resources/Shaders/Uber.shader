@@ -304,6 +304,8 @@ Shader "Hidden/Post FX/Uber Shader"
             }
             #endif
 
+            // color = pow(color, 0.5);
+
             color = UberSecondPass(color, uv);
 
             // Done !

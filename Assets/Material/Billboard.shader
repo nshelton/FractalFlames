@@ -7,6 +7,7 @@ Shader "Custom/Billboard"
 		[HDR] _Color ("color", Color) = (1,1,1,1)
 		_Size ("Size", float) = 0.5
 		_ColorScale ("ColorScale", float) = 1.0
+		_Palette ("Palette", float) = 1.0
 	}
 
 	SubShader 
@@ -40,6 +41,7 @@ Shader "Custom/Billboard"
 					float3 velocity;
 				};
 
+				float _Palette;
 				float _Size;
 				float _ColorScale;
 				sampler2D _SpriteTex;
@@ -70,16 +72,39 @@ Shader "Custom/Billboard"
 					float colormap = particleBuffer[instance_id].velocity.y / _ColorScale;
 					float colormapSig = exp(colormap) /(exp(colormap) + 1);
 
-					float3 col = pal(colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,1.0),float3(0.0,0.33,0.67) );
-					// float3  col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,1.0),float3(0.0,0.10,0.20) );
-					// float3  col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,1.0),float3(0.3,0.20,0.20) );
-					// float3  col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,0.5),float3(0.8,0.90,0.30) );
-					//float3  col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,0.7,0.4),float3(0.0,0.15,0.20) );
-					//float3  col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(2.0,1.0,0.0),float3(0.5,0.20,0.25) );
-					//float3  col = pal( colormapSig, float3(0.8,0.5,0.4),float3(0.2,0.4,0.2),float3(2.0,1.0,1.0),float3(0.0,0.25,0.25) );
+					float3 col ;
+					
+					if (_Palette < 0.1)
+					{
+						col= pal(colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,1.0),float3(0.0,0.33,0.67) );
+					}
+					else if ( _Palette < 0.2)
+					{
+						col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,1.0),float3(0.0,0.10,0.20) );
+					}
+					else if ( _Palette < 0.3)
+					{
+						col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,1.0),float3(0.3,0.20,0.20) );
+					}
+					else if ( _Palette < 0.4)
+					{
+						col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,1.0,0.5),float3(0.8,0.90,0.30) );
+					}
+					else if ( _Palette < 0.5)
+					{
+						col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(1.0,0.7,0.4),float3(0.0,0.15,0.20) );
+					}
+					else if ( _Palette < 0.6)
+					{
+						col = pal( colormapSig, float3(0.5,0.5,0.5),float3(0.5,0.5,0.5),float3(2.0,1.0,0.0),float3(0.5,0.20,0.25) );
+					}
+					else
+					{
+						col = pal( colormapSig, float3(0.8,0.5,0.4),float3(0.2,0.4,0.2),float3(2.0,1.0,1.0),float3(0.0,0.25,0.25) );
+					}
 
 
- 					output.color = float4(col, 1.0) * _Color;
+ 					output.color = saturate(float4(col, 1.0) * _Color);
 
 					return output;
 				}

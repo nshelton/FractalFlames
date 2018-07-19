@@ -26,12 +26,41 @@ public class FreeParticle : MonoBehaviour
     private int mWarpCount;
 
     [SerializeField]
-    private float MaxAge;
+    public float m_MaxAge ;
 
-    public Vector4 WeightsA;
-    public Vector4 WeightsB;
-    public Vector4 WeightsC;
-    public Vector4 WeightsD;
+    public float MaxAge 
+    {
+        get { return m_MaxAge;}
+        set { m_MaxAge = value;}
+    }
+
+    private float lastSwitchTime;
+    
+    [SerializeField]
+    public float switchDuration = 30f;
+
+    [SerializeField]
+    public bool m_autoSwitch ;
+
+    public bool autoSwitch 
+    {
+        get { return m_autoSwitch;}
+        set { m_autoSwitch = value;}
+    }
+    
+    public Vector3 Parameters {get; set;}
+
+    public Vector4 WeightsA {get; set;}
+    public Vector4 WeightsB {get; set;}
+    public Vector4 WeightsC {get; set;}
+    public Vector4 WeightsD {get; set;}
+
+    public Vector4 WeightModulationA {get; set;}
+    public Vector4 WeightModulationB {get; set;}
+    public Vector4 WeightModulationC {get; set;}
+    public Vector4 WeightModulationD {get; set;}
+
+
     public float TransitionSpeed = 0.99f;
 
     private Vector4 NextWeightsA;
@@ -41,7 +70,7 @@ public class FreeParticle : MonoBehaviour
 
     private bool isTransition = false;
 
-    public Vector4 Emitter;
+    public Vector3 Emitter {get; set;}
 
     Texture2D noiseTexture;
 
@@ -65,18 +94,21 @@ public class FreeParticle : MonoBehaviour
         Particle[] particleArray = new Particle[particleCount];
         for (int i = 0; i < particleCount; ++i)
         {
-            particleArray[i].position = Random.insideUnitSphere;
+            particleArray[i].position = Vector3.one;
             particleArray[i].velocity = Vector3.one * float.MaxValue;
             particleArray[i].velocity.x = Random.value * MaxAge;
         }
 
-        noiseTexture = new Texture2D(4096, Mathf.CeilToInt(particleCount / 4096));
+        noiseTexture = new Texture2D(
+            4096,
+            Mathf.CeilToInt(particleCount / 4096),
+            TextureFormat.RGBAFloat, false, false );
 
         for (int x = 0; x < noiseTexture.width; x++)
         {
             for (int y = 0; y < noiseTexture.height; y++)
             {
-                noiseTexture.SetPixel(x, y, new Color(Random.value, Random.value, Random.value));
+                noiseTexture.SetPixel(x, y, new Vector4(Random.value, Random.value, Random.value, Random.value));
             }
         }
 
@@ -132,11 +164,16 @@ public class FreeParticle : MonoBehaviour
         computeShader.SetFloat("NumParticles", particleCount);
         computeShader.SetFloat("MaxAge", MaxAge);
 
-        computeShader.SetVector("WeightsA", WeightsA);
-        computeShader.SetVector("WeightsB", WeightsB);
-        computeShader.SetVector("WeightsC", WeightsC);
-        computeShader.SetVector("WeightsD", WeightsD);
+        computeShader.SetVector("WeightsA", WeightModulationA + WeightsA);
+        computeShader.SetVector("WeightsB", WeightModulationB + WeightsB);
+        computeShader.SetVector("WeightsC", WeightModulationC + WeightsC);
+        computeShader.SetVector("WeightsD", WeightModulationD + WeightsD);
         computeShader.SetVector("Emitter", Emitter);
+
+        Vector3 paramMap = Parameters - (Vector3.up * 0.2f);
+        paramMap *= 15f;
+
+        computeShader.SetVector("Parameters", paramMap );
 
         computeShader.Dispatch(mComputeShaderKernelID, mWarpCount, 1, 1);
 
@@ -146,6 +183,13 @@ public class FreeParticle : MonoBehaviour
             WeightsB = Vector4.Lerp(NextWeightsB, WeightsB, TransitionSpeed);
             WeightsC = Vector4.Lerp(NextWeightsC, WeightsC, TransitionSpeed);
             WeightsD = Vector4.Lerp(NextWeightsD, WeightsD, TransitionSpeed);
+
+        }
+
+        if ( autoSwitch && Time.time - lastSwitchTime > switchDuration)
+        {
+            Randomize();
+            lastSwitchTime = Time.time;
         }
     }
 

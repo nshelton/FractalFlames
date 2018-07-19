@@ -30,11 +30,17 @@ SamplerState _LinearClamp;
 
 float rand(float n){return frac(sin(n) * 43758.5453123);}
 
+
 float3 random3(int id, float3 pos)
 {
-	float2 uv = float2((float)(id % 4096) , id / 4096.0);
-	uv /=  float2(4096.0, NumParticles / 4096.0 + 1 );
-	return frac( pos + NoiseTex.SampleLevel(_LinearClamp, uv, 0).rgb );
+	float2 uv = float2((float) (id % 4096) , (float)id / 4096.0);
+
+	uv /=  float2(4096.0, ceil(NumParticles / 4096.0) );
+
+	uv = frac(uv + Time + (float)id / NumParticles);
+
+	return  NoiseTex.SampleLevel(_LinearClamp, uv, 0).rgb;
+
 }
 
 // float3 TowardsOriginNegativeBias(float3 point)
@@ -70,9 +76,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	{ 
 		life = 0;
 		colormap = 0;
-		pos = 2.0 * Emitter * random3(id, pos) - Emitter;
+		float3 size = pow(WeightsD.xyz, (float3)3.0)  * 10.0;
+		pos = size * random3(id, pos) - size /2.0;
 	}
-	
+
 	life += (float)id/ (float)NumParticles;
 
 	float3 pos0 = pos;
@@ -112,6 +119,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	}
 
 	float maxVariation = WeightsC.x + WeightsC.y + WeightsC.z + WeightsC.a;
+
 	 random = rand(Time + (float)id/ (float)NumParticles) * maxVariation;
 
 	if(random < WeightsC.x)
@@ -125,6 +133,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	else if(random < WeightsC.x + WeightsC.y + WeightsC.z)
 	{
 		pos = Normalize(pos); 
+	}
+	else if(random < WeightsC.x + WeightsC.y + WeightsC.z + WeightsC.a)
+	{
+		pos = Shrink(pos); 
 	}
 	else 
 	{
