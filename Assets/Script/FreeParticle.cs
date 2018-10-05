@@ -42,23 +42,91 @@ public class FreeParticle : MonoBehaviour
     [SerializeField]
     public bool m_autoSwitch ;
 
+    [SerializeField]
+    public Vector4 m_randomRange = Vector4.one;
+
     public bool autoSwitch 
     {
         get { return m_autoSwitch;}
         set { m_autoSwitch = value;}
     }
-    
-    public Vector3 Parameters {get; set;}
+    public Vector4 Parameters 
+    {
+        get { return m_parameters; }
+        set { m_parameters = value; }
+    }
 
-    public Vector4 WeightsA {get; set;}
-    public Vector4 WeightsB {get; set;}
-    public Vector4 WeightsC {get; set;}
-    public Vector4 WeightsD {get; set;}
+    [SerializeField]
+    private Vector4 m_parameters;
 
-    public Vector4 WeightModulationA {get; set;}
-    public Vector4 WeightModulationB {get; set;}
-    public Vector4 WeightModulationC {get; set;}
-    public Vector4 WeightModulationD {get; set;}
+    public Vector4 WeightsA 
+    {
+        get { return m_weightsA; }
+        set { m_weightsA = value; }
+    }
+    public Vector4 WeightsB 
+    {
+        get { return m_weightsB; }
+        set { m_weightsB = value; }
+    }
+    public Vector4 WeightsC 
+    {
+        get { return m_weightsC; }
+        set { m_weightsC = value; }
+    }
+    public Vector4 WeightsD 
+    {
+        get { return m_weightsD; }
+        set { m_weightsD = value; }
+    }
+
+    public Vector4 WeightModulationA 
+    {
+        get { return m_weightModulationA; }
+        set { m_weightModulationA = value; }
+    }
+    public Vector4 WeightModulationB 
+    {
+        get { return m_weightModulationB; }
+        set { m_weightModulationB = value; }
+    }
+    public Vector4 WeightModulationC 
+    {
+        get { return m_weightModulationC; }
+        set { m_weightModulationC = value; }
+    }
+    public Vector4 WeightModulationD 
+    {
+        get { return m_weightModulationD; }
+        set { m_weightModulationD = value; }
+    }
+ 
+
+    public float OffsetX 
+    {
+        set { Parameters = new Vector4(value, Parameters.y, Parameters.z, Parameters.w); }
+    }
+
+   public float OffsetY 
+    {
+        set { Parameters = new Vector4(Parameters.x, value, Parameters.z, Parameters.w); }
+    }
+
+   public float OffsetZ
+    {
+        set { Parameters = new Vector4(Parameters.x, Parameters.y, value, Parameters.w); }
+    }
+
+
+    public Vector4 m_weightsA;
+    public Vector4 m_weightsB;
+    public Vector4 m_weightsC;
+    public Vector4 m_weightsD;
+
+    public Vector4 m_weightModulationA;
+    public Vector4 m_weightModulationB;
+    public Vector4 m_weightModulationC;
+    public Vector4 m_weightModulationD;
 
 
     public float TransitionSpeed = 0.99f;
@@ -67,6 +135,13 @@ public class FreeParticle : MonoBehaviour
     private Vector4 NextWeightsB;
     private Vector4 NextWeightsC;
     private Vector4 NextWeightsD;
+
+    public Vector4 NextParameters ;
+
+    private Vector4 NextModA;
+    private Vector4 NextModB;
+    private Vector4 NextModC;
+    private Vector4 NextModD;
 
     private bool isTransition = false;
 
@@ -133,28 +208,24 @@ public class FreeParticle : MonoBehaviour
             particleBuffer.Release();
     }
 
+    public Vector4 RandomVector()
+    {
+        return new Vector4(Random.value,Random.value,Random.value,Random.value);
+    }
+
     public void Randomize()
     {
-        NextWeightsA.x = Random.value * 2f - 1f;
-        NextWeightsA.y = Random.value * 2f - 1f;
-        NextWeightsA.z = Random.value * 2f - 1f;
-        NextWeightsA.w = Random.value * 2f - 1f;
 
-        NextWeightsB.x = Random.value * 2f - 1f;
-        NextWeightsB.y = Random.value * 2f - 1f;
-        NextWeightsB.z = Random.value * 2f - 1f;
-        NextWeightsB.w = Random.value * 2f - 1f;
+        NextWeightsA = Vector4.Scale(RandomVector(), m_randomRange);
+        NextWeightsB = Vector4.Scale(RandomVector(), m_randomRange);
+        NextWeightsC = Vector4.Scale(RandomVector(), m_randomRange);
+        NextWeightsD = Vector4.Scale(RandomVector(), m_randomRange);
+        NextModA = Vector4.Scale(RandomVector(), m_randomRange);
+        NextModB = Vector4.Scale(RandomVector(), m_randomRange);
+        NextModC = Vector4.Scale(RandomVector(), m_randomRange);
+        NextModD = Vector4.Scale(RandomVector(), m_randomRange);
 
-        NextWeightsC.x = Random.value * 2f - 1f;
-        NextWeightsC.y = Random.value * 2f - 1f;
-        NextWeightsC.z = Random.value * 2f - 1f;
-        NextWeightsC.w = Random.value * 2f - 1f;
-
-        NextWeightsD.x = Random.value * 2f - 1f;
-        NextWeightsD.y = Random.value * 2f - 1f;
-        NextWeightsD.z = Random.value * 2f - 1f;
-        NextWeightsD.w = Random.value * 2f - 1f;
-
+        NextParameters = Vector4.Scale(RandomVector(), m_randomRange);
         isTransition = true;
     }
 
@@ -168,12 +239,8 @@ public class FreeParticle : MonoBehaviour
         computeShader.SetVector("WeightsB", WeightModulationB + WeightsB);
         computeShader.SetVector("WeightsC", WeightModulationC + WeightsC);
         computeShader.SetVector("WeightsD", WeightModulationD + WeightsD);
+        computeShader.SetVector("Parameters", m_parameters);
         computeShader.SetVector("Emitter", Emitter);
-
-        Vector3 paramMap = Parameters - (Vector3.up * 0.2f);
-        paramMap *= 15f;
-
-        computeShader.SetVector("Parameters", paramMap );
 
         computeShader.Dispatch(mComputeShaderKernelID, mWarpCount, 1, 1);
 
@@ -184,6 +251,15 @@ public class FreeParticle : MonoBehaviour
             WeightsC = Vector4.Lerp(NextWeightsC, WeightsC, TransitionSpeed);
             WeightsD = Vector4.Lerp(NextWeightsD, WeightsD, TransitionSpeed);
 
+            WeightModulationA = Vector4.Lerp(NextModA, WeightModulationA, TransitionSpeed);
+            WeightModulationB = Vector4.Lerp(NextModB, WeightModulationB, TransitionSpeed);
+            WeightModulationC = Vector4.Lerp(NextModC, WeightModulationC, TransitionSpeed);
+            WeightModulationD = Vector4.Lerp(NextModD, WeightModulationD, TransitionSpeed);
+
+            //m_parameters = Vector4.Lerp(NextParameters, m_parameters, TransitionSpeed);
+
+            if ( (WeightsA - NextWeightsA).sqrMagnitude < 0.0001f)
+                isTransition = false;
         }
 
         if ( autoSwitch && Time.time - lastSwitchTime > switchDuration)
@@ -191,6 +267,7 @@ public class FreeParticle : MonoBehaviour
             Randomize();
             lastSwitchTime = Time.time;
         }
+
     }
 
     void OnRenderObject()
